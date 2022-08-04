@@ -1,0 +1,242 @@
+# Copyright 2019 Amazon.com, Inc. and its affiliates. All Rights Reserved.
+
+
+
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Pipeline Template"
+
+Parameters:
+
+  GitRepositoryName:
+    Type:  String
+    Default: "<the-default-git-repository-for-sap-commerce-project>"
+  Environment:
+    Type:  String
+    Default: "development"
+  S3BucketForCommerceConfigurations:
+    Type:  String
+    Default: "<s3-bucket-env-config>"
+  S3BucketForCommerceSoftware:
+    Type:  String
+    Default: "<s3-bucket-software>"
+  SAPCommerceReleaseZipFile:
+    Type:  String
+    Default: "CXCOMM210500P_5-70005661.ZIP"        
+  HelmReleaseName:
+    Type:  String
+    Default: "default-project"
+  BranchName:
+    Type:  String
+    Default: "master"
+  StageDomainName:
+    Type:  String
+    Default: "production.url"
+  ProductionDomainName:
+    Type:  String
+    Default: "stage.url"
+  EKSClusterName:
+    Type: String
+    Default: "hybris-cluster"    
+  DeploymentRoleName:
+    Type: String
+    Default: "eadk-cicd-role"    
+  ECRRepositoryName:
+    Type: String
+    Default: "xxx.dkr.ecr.eu-west-1.amazonaws.com/sap-commerce-sample-project"    
+  SapCommercePodRoleArn:
+    Type: String
+    Default: "<sap-commerce-role-arn>"    
+
+
+
+Conditions: 
+  BranchMaster: !Equals [ !Ref BranchName, "main" ]
+  BranchDevelop: !Equals [ !Ref BranchName, "develop"]
+  BranchRelease: !Equals [!Select [ 0, !Split [ "-", !Ref BranchName ]], "release"]
+
+
+Resources:
+
+#----------------------------------------------------------------------#
+# CodeBuild Projects
+#----------------------------------------------------------------------#
+  BuildPlatformAction: 
+    Type: AWS::CodeBuild::Project 
+    Properties: 
+      Name: !Join ['-', [!Ref 'GitRepositoryName', 'BuildPlatformAction' ]]
+      Source: 
+        Type: CODEPIPELINE 
+        BuildSpec: 'aws-build/buildspec-files/BuildAction.yaml'
+      Environment: 
+        Type: LINUX_CONTAINER 
+        ComputeType: BUILD_GENERAL1_MEDIUM
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:3.0
+        PrivilegedMode: true
+        EnvironmentVariables:         
+          - Name: GitRepositoryName
+            Value: !Ref GitRepositoryName
+          - Name: Environment
+            Value: !Ref Environment
+          - Name: S3BucketForCommerceConfigurations
+            Value: !Ref S3BucketForCommerceConfigurations
+          - Name: S3BucketForCommerceSoftware
+            Value: !Ref S3BucketForCommerceSoftware
+          - Name: SAPCommerceReleaseZipFile
+            Value: !Ref SAPCommerceReleaseZipFile
+          - Name: HelmReleaseName
+            Value: !Ref HelmReleaseName
+          - Name: BranchName
+            Value: !Ref BranchName
+          - Name: StageDomainName
+            Value: !Ref StageDomainName
+          - Name: ProductionDomainName
+            Value: !Ref ProductionDomainName
+          - Name: EKSClusterName
+            Value: !Ref EKSClusterName
+          - Name: DeploymentRoleName
+            Value: !Ref DeploymentRoleName
+          - Name: ECRRepositoryName
+            Value: !Ref ECRRepositoryName
+          - Name: SapCommercePodRoleArn
+            Value: !Ref SapCommercePodRoleArn
+              
+
+      Artifacts: 
+        Type: CODEPIPELINE 
+      ServiceRole: !Sub 'arn:aws:iam::${AWS::AccountId}:role/CodeBuildRole'
+      TimeoutInMinutes: 20 
+
+  DeployAction: 
+    Type: AWS::CodeBuild::Project 
+    Properties: 
+      Name: !Join ['-', [!Ref 'GitRepositoryName', 'DeployAction']]
+      Source: 
+        Type: CODEPIPELINE 
+        BuildSpec: 'aws-build/buildspec-files/DeployAction.yaml'
+      Environment: 
+        Type: LINUX_CONTAINER 
+        ComputeType: BUILD_GENERAL1_MEDIUM
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:3.0
+        PrivilegedMode: true
+
+        EnvironmentVariables:         
+          - Name: GitRepositoryName
+            Value: !Ref GitRepositoryName
+          - Name: Environment
+            Value: !Ref Environment
+          - Name: S3BucketForCommerceConfigurations
+            Value: !Ref S3BucketForCommerceConfigurations
+          - Name: S3BucketForCommerceSoftware
+            Value: !Ref S3BucketForCommerceSoftware
+          - Name: SAPCommerceReleaseZipFile
+            Value: !Ref SAPCommerceReleaseZipFile
+          - Name: HelmReleaseName
+            Value: !Ref HelmReleaseName
+          - Name: BranchName
+            Value: !Ref BranchName
+          - Name: StageDomainName
+            Value: !Ref StageDomainName
+          - Name: ProductionDomainName
+            Value: !Ref ProductionDomainName
+          - Name: EKSClusterName
+            Value: !Ref EKSClusterName
+          - Name: DeploymentRoleName
+            Value: !Ref DeploymentRoleName
+          - Name: ECRRepositoryName
+            Value: !Ref ECRRepositoryName           
+          - Name: SapCommercePodRoleArn
+            Value: !Ref SapCommercePodRoleArn
+
+      Artifacts: 
+        Type: CODEPIPELINE 
+      ServiceRole: !Sub 'arn:aws:iam::${AWS::AccountId}:role/CodeBuildRole'
+      TimeoutInMinutes: 20 
+
+  SwitchAction: 
+    Type: AWS::CodeBuild::Project 
+    Properties: 
+      Name: !Join ['-', [!Ref 'GitRepositoryName', 'SwitchAction']]
+      Source: 
+        Type: CODEPIPELINE 
+        BuildSpec: 'aws-build/buildspec-files/SwitchAction.yaml'
+      Environment: 
+        Type: LINUX_CONTAINER 
+        ComputeType: BUILD_GENERAL1_MEDIUM
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:3.0
+        EnvironmentVariables:         
+          - Name: GitRepositoryName
+            Value: !Ref GitRepositoryName
+          - Name: Environment
+            Value: !Ref Environment
+          - Name: S3BucketForCommerceConfigurations
+            Value: !Ref S3BucketForCommerceConfigurations
+          - Name: S3BucketForCommerceSoftware
+            Value: !Ref S3BucketForCommerceSoftware
+          - Name: SAPCommerceReleaseZipFile
+            Value: !Ref SAPCommerceReleaseZipFile
+          - Name: HelmReleaseName
+            Value: !Ref HelmReleaseName
+          - Name: BranchName
+            Value: !Ref BranchName
+          - Name: StageDomainName
+            Value: !Ref StageDomainName
+          - Name: ProductionDomainName
+            Value: !Ref ProductionDomainName
+          - Name: EKSClusterName
+            Value: !Ref EKSClusterName
+          - Name: DeploymentRoleName
+            Value: !Ref DeploymentRoleName
+          - Name: ECRRepositoryName
+            Value: !Ref ECRRepositoryName 
+          - Name: SapCommercePodRoleArn
+            Value: !Ref SapCommercePodRoleArn
+         
+      Artifacts: 
+        Type: CODEPIPELINE 
+      ServiceRole: !Sub 'arn:aws:iam::${AWS::AccountId}:role/CodeBuildRole'
+      TimeoutInMinutes: 20 
+
+  DecommissionAction: 
+    Type: AWS::CodeBuild::Project 
+    Properties: 
+      Name: !Join ['-', [!Ref 'GitRepositoryName', 'DecommissionAction']]
+      Source: 
+        Type: CODEPIPELINE 
+        BuildSpec: 'aws-build/buildspec-files/DecommissionAction.yaml'
+      Environment: 
+        Type: LINUX_CONTAINER 
+        ComputeType: BUILD_GENERAL1_MEDIUM
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:3.0
+        EnvironmentVariables:         
+          - Name: GitRepositoryName
+            Value: !Ref GitRepositoryName
+          - Name: Environment
+            Value: !Ref Environment
+          - Name: S3BucketForCommerceConfigurations
+            Value: !Ref S3BucketForCommerceConfigurations
+          - Name: S3BucketForCommerceSoftware
+            Value: !Ref S3BucketForCommerceSoftware
+          - Name: SAPCommerceReleaseZipFile
+            Value: !Ref SAPCommerceReleaseZipFile
+          - Name: HelmReleaseName
+            Value: !Ref HelmReleaseName
+          - Name: BranchName
+            Value: !Ref BranchName
+          - Name: StageDomainName
+            Value: !Ref StageDomainName
+          - Name: ProductionDomainName
+            Value: !Ref ProductionDomainName
+          - Name: EKSClusterName
+            Value: !Ref EKSClusterName
+          - Name: DeploymentRoleName
+            Value: !Ref DeploymentRoleName
+          - Name: ECRRepositoryName
+            Value: !Ref ECRRepositoryName
+          - Name: SapCommercePodRoleArn
+            Value: !Ref SapCommercePodRoleArn
+          
+
+      Artifacts: 
+        Type: CODEPIPELINE 
+      ServiceRole: !Sub 'arn:aws:iam::${AWS::AccountId}:role/CodeBuildRole'
+      TimeoutInMinutes: 20 

@@ -1,0 +1,15 @@
+# Copyright 2022 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+
+apiVersion: v2
+name: sap-commerce-blue-green
+description: A Helm chart for SAP Commerce blue/green deployments
+
+type: application
+
+version: 0.0.1
+
+appVersion: "0.0.1"
+
+maintainers:
+  - name: AWS Proserve GSP
+    email: bersanf@amazon.com

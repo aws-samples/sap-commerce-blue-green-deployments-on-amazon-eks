@@ -1,0 +1,26 @@
+# Copyright 2022 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: default-sap-commerce-service-stage
+  namespace: "{{ .Values.kubernetes.namespace }}"
+  annotations:
+    app.kubernetes.io/managed-by: "Helm"
+    meta.helm.sh/release-name: "{{ .Values.helm.release }}"
+    meta.helm.sh/release-namespace: "{{ .Values.helm.namespace }}"  
+spec:
+  ports:
+    - protocol: TCP
+      port: 8081
+      targetPort: 8081
+  selector:
+    app: sap-commerce
+    aspect: default
+    {{- if eq .Values.slot.production.color "blue" }}
+    slot: green
+    {{- else }}
+    slot: blue
+    {{- end }}
+  sessionAffinity: None
+  type: NodePort

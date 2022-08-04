@@ -1,0 +1,36 @@
+# Copyright 2022 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+        docker: latest
+        java: corretto11
+
+    commands: 
+      - nohup /usr/local/bin/dockerd --host=unix:///var/run/docker.sock --host=tcp://127.0.0.1:2375 --storage-driver=overlay2&
+      - timeout 15 sh -c "until docker info; do echo .; sleep 1; done"
+
+  build: 
+    commands: 
+      - echo "Build stage"
+      - echo "Print Variables"
+      - echo "$(env)"
+      - aws s3 cp s3://$S3BucketForCommerceSoftware/$SAPCommerceReleaseZipFile /tmp
+      - ls -ltr /tmp/$SAPCommerceReleaseZipFile
+      - unzip -qq /tmp/$SAPCommerceReleaseZipFile -d .
+      - cd aws-build/sap-commerce-build
+      - echo "Start build process of SAP Commerce Platform..."
+      - > 
+        ./create-docker-platform-image.sh \
+        --ECRRepositoryName $ECRRepositoryName \
+        --BranchName $BranchName \
+        --Region $AWS_REGION
+      - echo "SAP Commerce Platform successfully built."
+
+artifacts:
+  files:
+    - '**/*'
+
+

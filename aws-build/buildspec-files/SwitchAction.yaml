@@ -1,0 +1,25 @@
+# Copyright 2022 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      python: latest
+
+  build:
+    commands:
+      - echo "Print Variables"
+      - echo "$(env)"
+      - echo "Installing software"
+      - pip3 install yq
+      - curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+      - chmod 700 get_helm.sh
+      - ./get_helm.sh
+      - AWS_ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+      - HelmReleaseName=$HelmReleaseName
+      - aws eks update-kubeconfig --name ${EKSClusterName} --region ${AWS_REGION} --role-arn arn:aws:iam::$AWS_ACCOUNT:role/$DeploymentRoleName
+      - export KUBE_CONFIG_PATH=/root/.kube/config
+      - cd aws-build/helm-deploy/helm-charts/sap-commerce/scripts
+      - ./switch.sh --HelmReleaseName $HelmReleaseName
+

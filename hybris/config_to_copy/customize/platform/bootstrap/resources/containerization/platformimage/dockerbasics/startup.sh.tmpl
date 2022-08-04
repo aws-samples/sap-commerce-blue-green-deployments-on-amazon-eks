@@ -1,0 +1,84 @@
+#set( $DOLAR_SIGN = '$' )
+#!/bin/bash
+set -e
+
+### This script accepts three arguments:
+# - $1: The aspect name
+# - $2: The command to execute (when aspect is deployment)
+# - $3... additional arguments for aspect specific execution. (to be used at aspect level only)
+
+
+
+export CATALINA_OPTS="-DHYBRIS_LOG_DIR=$HYBRIS_LOG_DIR -DPLATFORM_HOME=$PLATFORM_HOME $CATALINA_SECURITY_OPTS $CATALINA_MEMORY_OPTS -Djava.locale.providers=COMPAT,CLDR -Dorg.apache.tomcat.util.digester.PROPERTY_SOURCE=de.hybris.tomcat.EnvPropertySource $ADDITIONAL_CATALINA_OPTS"
+export ASPECT_NAME=${1:-default}
+export ENVIRONMENT=$SAP_COMMERCE_ENVIRONMENT
+export CATALINA_BASE="/opt/aspects/$ASPECT_NAME/tomcat"
+export HYBRIS_OPT_CONFIG_DIR="/opt/aspects/$ASPECT_NAME/hybris/conf"
+export SOLR_BUNDLED_DIR="/opt/hybris/bin/modules/search-and-navigation/solrserver/resources/solr"
+export SOLR_CLOUD_SCRIPTS_PATH="$SOLR_BUNDLED_DIR/$SOLR_VERSION/server/server/scripts/cloud-scripts/"
+
+yWaitForPort.sh $WAIT_FOR
+
+# copy the environment specific applicaiton configuration
+aws s3 cp s3://$S3_BUCKET_COMMERCE_CONFIGURATION/environments/$ENVIRONMENT/ $HYBRIS_OPT_CONFIG_DIR --recursive --exclude "*" --include "*-local.properties"
+
+LOCAL_PROPERTIES=$HYBRIS_OPT_CONFIG_DIR'/*.properties'
+
+echo "ASPECT_NAME - $ASPECT_NAME -"
+echo "ENVIRONMENT - $ENVIRONMENT -"
+echo "HYBRIS_OPT_CONFIG_DIR - $HYBRIS_OPT_CONFIG_DIR"
+echo "LOCAL_PROPERTIES - $LOCAL_PROPERTIES"
+echo "S3_BUCKET_COMMERCE_CONFIGURATION - $S3_BUCKET_COMMERCE_CONFIGURATION"
+echo "Additional arg and beyond - ${@:2}"
+
+### replace the placeholders in the configuration properties files
+env > /tmp/env.ystartup.file.tmp
+for file in $LOCAL_PROPERTIES; do
+  if [ -f "$file" ]; then
+    while read i; do
+      KEY=`echo $i | cut -f1 -d'='`
+      VAL=`echo $i | cut -f2- -d'='`
+      echo "Replacing any instances of "'${'"$KEY"'}'" with $VAL"
+      sed -i "s/"'${'"$KEY"'}'"/$(echo $VAL | sed -e 's/\\/\\\\/g' -e 's/\//\\\//g' -e 's/&/\\\&/g')/g" $file
+    done </tmp/env.ystartup.file.tmp
+  fi
+done
+rm -rf /tmp/env.file.tmp
+
+if [ "$JVM_ROUTE" == "dynamic" ]; then
+  export JVM_ROUTE="$(yGenerateUUID.sh)"
+  echo "Dynamic jvmRoute has been requested. Using: $JVM_ROUTE"
+fi
+
+if [ "$ASPECT_NAME" == "deployment" ]; then
+  # create the local.properties file in hybris/config using the configuration files available
+  cat $HYBRIS_OPT_CONFIG_DIR/*-local.properties >> /opt/hybris/config/local.properties
+
+  cat /opt/hybris/config/local.properties
+
+  # get the second argument that is the command
+  COMMAND="$2"
+  
+  if [ "$COMMAND" == "solr_updateconf" ]; then
+    echo "uploading solr configuration with zookeeper cli"
+    echo "Command executed:"
+    echo "./zkcli.sh -zkhost $ZOOKEEPER_URL -cmd upconfig -confdir /opt/hybris/config/solr/instances/cloud/configsets/default/conf/ -confname default"
+
+    cd $SOLR_CLOUD_SCRIPTS_PATH
+    ./zkcli.sh -zkhost $ZOOKEEPER_URL -cmd upconfig -confdir /opt/hybris/config/solr/instances/cloud/configsets/default/conf/ -confname default
+    exit 0
+  fi
+  # We need to copy the properties files from aspect to /opt/hybris/config directory
+  echo "We need to copy the properties files from aspect to /opt/hybris/config directory"
+  cp $HYBRIS_OPT_CONFIG_DIR/*.properties /opt/hybris/config/
+
+  # we use cd because setantenv.sh uses `pwd` to export PLATFORM_HOME
+  echo "The run mode is deployment, it means that we are going to create a new typesystem"
+  cd $PLATFORM_HOME 
+  . ./setantenv.sh
+
+  exec ant -Dde.hybris.platform.ant.production.skip.build=true -buildfile $PLATFORM_HOME ${@:2}
+
+else
+  exec /opt/tomcat/bin/catalina.sh ${3:-run}
+fi

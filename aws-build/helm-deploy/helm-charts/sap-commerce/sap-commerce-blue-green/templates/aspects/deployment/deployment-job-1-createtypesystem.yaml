@@ -1,0 +1,48 @@
+# Copyright 2022 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+
+{{ if .Values.slot.stage.createTypeSystem }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: "sap-commerce-createtypesystem"
+  namespace: "{{ .Values.kubernetes.namespace }}"
+  annotations:
+    app.kubernetes.io/managed-by: "Helm"
+    meta.helm.sh/release-name: "{{ .Values.helm.release }}"
+    meta.helm.sh/release-namespace: "{{ .Values.helm.namespace }}"  
+    #helm hooks
+    "helm.sh/hook": pre-upgrade
+    "helm.sh/hook-weight": "1"
+    "helm.sh/hook-delete-policy": hook-succeeded
+spec:
+  completions: 1
+  parallelism: 1
+  template:
+    metadata:
+      name: "sap-commerce-createtypesystem"
+    spec:
+      serviceAccount: "{{ .Values.kubernetes.sap.serviceAccount }}"
+      serviceAccountName: "{{ .Values.kubernetes.sap.serviceAccountName }}"
+      restartPolicy: Never
+      containers:
+      {{- if eq .Values.slot.production.color "blue" }}      
+      - name: "sap-commerce-createtypesystem"
+        image: "{{ .Values.image.repository }}:{{ .Values.slot.green.release }}"
+        args: ["deployment","createtypesystem -DtypeSystemName={{ .Values.slot.green.typeSystem }}"]
+      {{- else }}            
+      - name: "sap-commerce-createtypesystem"
+        image: "{{ .Values.image.repository }}:{{ .Values.slot.blue.release }}"
+        args: ["deployment","createtypesystem -DtypeSystemName={{ .Values.slot.blue.typeSystem }}"]
+      {{- end }}
+        env:
+          - name: TYPE_SYSTEM_NAME
+            #set existing productive type system to be able to create a new one
+            value: "{{ .Values.slot.production.typeSystem }}"      
+          - name: MY_POD_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP        
+        envFrom:
+          - configMapRef:
+              name: sap-commerce-configmap      
+{{ end }}        

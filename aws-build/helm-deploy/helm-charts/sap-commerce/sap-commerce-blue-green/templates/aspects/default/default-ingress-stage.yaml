@@ -1,0 +1,35 @@
+# Copyright 2022 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "1"
+    app.kubernetes.io/managed-by: "Helm"
+    meta.helm.sh/release-name: "{{ .Values.helm.release }}"
+    meta.helm.sh/release-namespace: "{{ .Values.helm.namespace }}"  
+    alb.ingress.kubernetes.io/target-group-attributes: stickiness.enabled=true,stickiness.lb_cookie.duration_seconds=1200
+    alb.ingress.kubernetes.io/auth-session-cookie: JSESSIONID
+    alb.ingress.kubernetes.io/certificate-arn: {{ $.Values.slot.stage.httpsCertificateArn }}
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    external-dns.alpha.kubernetes.io/hostname: {{ $.Values.slot.stage.domainName }}
+    kubernetes.io/ingress.class: alb
+  finalizers:
+  - ingress.k8s.aws/resources
+  generation: 1
+  name: default-ingress-sap-commerce-stage
+  namespace: "{{ .Values.kubernetes.namespace }}"
+spec:
+  rules:
+  - host: {{ .Values.slot.stage.domainName }}
+    http:
+      paths:
+      - backend:
+          service:
+            name: default-sap-commerce-service-stage
+            port:
+              number: 8081
+        path: /*
+        pathType: ImplementationSpecific

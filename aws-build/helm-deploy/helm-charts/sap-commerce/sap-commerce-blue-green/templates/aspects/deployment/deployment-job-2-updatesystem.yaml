@@ -1,0 +1,50 @@
+{{ if .Values.deploy.performSystemUpdate }}
+apiVersion: batch/v1
+kind: Job
+# Copyright 2022 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+
+metadata:
+  name: "sap-commerce-updatesystem"
+  namespace: "{{ .Values.kubernetes.namespace }}"
+  annotations:
+    app.kubernetes.io/managed-by: "Helm"
+    meta.helm.sh/release-name: "{{ .Values.helm.release }}"
+    meta.helm.sh/release-namespace: "{{ .Values.helm.namespace }}"
+    #helm hooks
+    "helm.sh/hook": pre-upgrade
+    "helm.sh/hook-weight": "2"
+    "helm.sh/hook-delete-policy": hook-succeeded
+spec:
+  completions: 1
+  parallelism: 1
+  template:
+    metadata:
+      name: "sap-commerce-updatesystem"
+    spec:
+      serviceAccount: "{{ .Values.kubernetes.sap.serviceAccount }}"
+      serviceAccountName: "{{ .Values.kubernetes.sap.serviceAccountName }}"       
+      restartPolicy: Never
+      containers:
+      {{- if eq .Values.slot.production.color "blue" }}
+      - name: "sap-commerce-updatesystem"
+        image: "{{ .Values.image.repository }}:{{ .Values.slot.green.release }}"
+        args: ["deployment","updatesystem"]
+        env:
+          - name: TYPE_SYSTEM_NAME
+            value: "{{ .Values.slot.green.typeSystem }}"
+      {{- else }}
+      - name: "sap-commerce-updatesystem"
+        image: "{{ .Values.image.repository }}:{{ .Values.slot.blue.release }}"
+        args: ["deployment","updatesystem"]
+        env:
+          - name: TYPE_SYSTEM_NAME
+            value: "{{ .Values.slot.blue.typeSystem }}"
+      {{- end }}
+          - name: MY_POD_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP        
+        envFrom:
+          - configMapRef:
+              name: sap-commerce-configmap      
+{{ end }}

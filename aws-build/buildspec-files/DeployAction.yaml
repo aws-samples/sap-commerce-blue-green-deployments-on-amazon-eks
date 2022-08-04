@@ -1,0 +1,50 @@
+# Copyright 2022 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      java: corretto11
+      python: latest
+
+  build:
+    commands:
+      - echo "Print Variables"
+      - AWS_ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+      - echo "Installing software"
+      - pip3 install yq
+      # - curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+      # - chmod 700 get_helm.sh
+      # - ./get_helm.sh
+      - curl -fsSL -o helm-v3.8.0-linux-amd64.tar.gz https://get.helm.sh/helm-v3.8.0-linux-amd64.tar.gz
+      - tar -xvf helm-v3.8.0-linux-amd64.tar.gz
+      - mv linux-amd64/helm /usr/local/bin/
+      - helm version
+      - aws eks update-kubeconfig --name ${EKSClusterName} --region ${AWS_REGION} --role-arn arn:aws:iam::$AWS_ACCOUNT:role/$DeploymentRoleName
+      - export KUBE_CONFIG_PATH=/root/.kube/config
+      - echo "Deploy stage"
+      - cd aws-build/helm-deploy/helm-charts/sap-commerce/scripts/
+      - echo "Getting the production release from helm chart"
+      - ProductionRelease=$(./get-production-release.sh --HelmReleaseName $HelmReleaseName --StageRelease $BranchName)
+      - ProductionTypeSystem=$(./get_production_type_system.sh --HelmReleaseName $HelmReleaseName)
+      - echo "Here the environment variables:"
+      - echo "$(env)"
+      - >
+        ./deploy.sh \
+        --DeployMode blue-green \
+        --Environment $Environment \
+        --HelmReleaseName $HelmReleaseName \
+        --S3BucketForCommerceConfigurations $S3BucketForCommerceConfigurations \
+        --ECRRepositoryName $ECRRepositoryName \
+        --StageRelease $BranchName \
+        --StageTypeSystemExists false \
+        --PerformSystemUpdate true \
+        --ProductionTypeSystem $ProductionTypeSystem \
+        --ProductionRelease $ProductionRelease \
+        --StageDomain $StageDomainName \
+        --ProductionDomain $ProductionDomainName \
+        --SapCommercePodRoleArn $SapCommercePodRoleArn \
+        --Region $AWS_REGION
+      - echo "Deploy completed"
+

@@ -1,0 +1,201 @@
+# Copyright 2019 Amazon.com, Inc. and its affiliates. All Rights Reserved.
+#
+
+
+
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Pipeline Template"
+
+Parameters:
+
+  GitRepositoryName:
+    Type:  String
+  BranchName:
+    Type:  String
+    Default: "master"
+ 
+
+
+Conditions: 
+  BranchMaster: !Equals [ !Ref BranchName, "main" ]
+  BranchDevelop: !Equals [ !Ref BranchName, "develop"]
+  BranchRelease: !Equals [!Select [ 0, !Split [ "-", !Ref BranchName ]], "release"]
+
+
+Resources:
+
+
+#----------------------------------------------------------------------#
+# Create CodeCommit Repository
+# Condition: Only at Microservice Setup
+#----------------------------------------------------------------------#
+  # Repository:
+  #   Type: AWS::CodeCommit::Repository
+  #   Condition: Setup
+  #   Properties: 
+  #     GitRepositoryName: !Ref GitRepositoryName
+  #     Code: 
+  #       S3: 
+  #         Bucket: !Sub '${AWS::AccountId}-templates'
+  #         Key: seed.zip
+
+
+#----------------------------------------------------------------------#
+# Resource CodePipeline
+#----------------------------------------------------------------------#
+  Pipeline:
+    Type: "AWS::CodePipeline::Pipeline"
+    Properties:
+      Name: !Join ['-', [!Ref GitRepositoryName, !Ref BranchName]]
+      RoleArn: !Sub 'arn:aws:iam::${AWS::AccountId}:role/CodePipelineRole'
+      ArtifactStore:
+        Type: S3
+        Location: !Sub '${AWS::AccountId}-templates'
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: App
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Version: "1"
+                Provider: CodeCommit
+              Configuration:
+                RepositoryName: !Ref GitRepositoryName
+                BranchName: !Ref BranchName
+              Namespace: SourceVariables
+              OutputArtifacts:
+                - Name: Source 
+              RunOrder: 1
+#----------------------------------------------------------------------#
+# Regardless of branch type, the CI Stage will always be created.
+#----------------------------------------------------------------------#
+        - Name: Continuous-Integration
+          Actions:
+            - Name: BuildPlatformAction
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: "1"
+                Provider: CodeBuild
+              OutputArtifacts:
+                - Name: Build1
+              InputArtifacts:
+                - Name: Source               
+              Configuration:
+                ProjectName: !Join ['-', [!Ref 'GitRepositoryName', 'BuildPlatformAction' ]]
+                EnvironmentVariables: '[{"name":"BranchName","value":"#{SourceVariables.BranchName}","type":"PLAINTEXT"}]'
+              RunOrder: 1
+
+
+#----------------------------------------------------------------------#
+# If BranchName=Release-*, then create CD Stage to deploy to Prod
+#----------------------------------------------------------------------#
+        - !If 
+          - BranchRelease
+          - Name: Deploy  
+            Actions: 
+            - Name: DeployAction
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: "1"
+                Provider: CodeBuild
+              InputArtifacts:
+                - Name: Source 
+              OutputArtifacts:
+                - Name: DeployAction                
+              Configuration:
+                ProjectName: !Join ['-', [!Ref 'GitRepositoryName', 'DeployAction']]
+                EnvironmentVariables: '[{"name":"BranchName","value":"#{SourceVariables.BranchName}","type":"PLAINTEXT"}]'
+
+              RunOrder: 2
+          - !Ref AWS::NoValue 
+
+#----------------------------------------------------------------------#
+# If BranchName=Release-*, then create Manual Approval stage
+#----------------------------------------------------------------------#
+        - !If 
+          - BranchRelease
+          - Name: Approve-Switch  
+            Actions: 
+            - Name: ApproveSwitchAction
+              ActionTypeId:
+                Category: Approval
+                Owner: AWS
+                Version: "1"
+                Provider: Manual
+              OutputArtifacts: []              
+
+              RunOrder: 2
+          - !Ref AWS::NoValue 
+
+#----------------------------------------------------------------------#
+# If BranchName=Release-*, then create CD Stage to deploy to Prod
+#----------------------------------------------------------------------#
+        - !If 
+          - BranchRelease
+          - Name: Switch  
+            Actions: 
+            - Name: SwitchAction
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: "1"
+                Provider: CodeBuild
+              InputArtifacts:
+                - Name: Source 
+              OutputArtifacts:
+                - Name: SwitchAction                
+              Configuration:
+                ProjectName: !Join ['-', [!Ref 'GitRepositoryName', 'SwitchAction']]
+                EnvironmentVariables: '[{"name":"BranchName","value":"#{SourceVariables.BranchName}","type":"PLAINTEXT"}]'
+
+              RunOrder: 2
+          - !Ref AWS::NoValue 
+
+#----------------------------------------------------------------------#
+# If BranchName=Release-*, then create Manual Approval stage
+#----------------------------------------------------------------------#
+        - !If 
+          - BranchRelease
+          - Name: Approve-Decommission  
+            Actions: 
+            - Name: ApproveDecommissionAction
+              ActionTypeId:
+                Category: Approval
+                Owner: AWS
+                Version: "1"
+                Provider: Manual
+              # InputArtifacts: []
+              OutputArtifacts: []              
+              # Configuration:
+              #   # ProjectName: !Join ['-', [!Ref 'GitRepositoryName', 'SwitchAction']]
+              #   # EnvironmentVariables: '[{"name":"BranchName","value":"#{SourceVariables.BranchName}","type":"PLAINTEXT"}]'
+
+              RunOrder: 2
+          - !Ref AWS::NoValue 
+
+#----------------------------------------------------------------------#
+# If BranchName=Release-*, then create CD Stage to deploy to Prod
+#----------------------------------------------------------------------#
+        - !If 
+          - BranchRelease
+          - Name: Decommission
+            Actions: 
+            - Name: DecommissionAction
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: "1"
+                Provider: CodeBuild
+              InputArtifacts:
+                - Name: Source 
+              OutputArtifacts:
+                - Name: Decommission                
+              Configuration:
+                ProjectName: !Join ['-', [!Ref 'GitRepositoryName', 'DecommissionAction']]
+                EnvironmentVariables: '[{"name":"BranchName","value":"#{SourceVariables.BranchName}","type":"PLAINTEXT"}]'
+
+              RunOrder: 2
+          - !Ref AWS::NoValue 

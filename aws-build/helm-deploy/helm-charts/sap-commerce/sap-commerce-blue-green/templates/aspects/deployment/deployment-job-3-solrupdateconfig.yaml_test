@@ -1,0 +1,51 @@
+{{ if .Values.perform_solr_config_update }}
+apiVersion: batch/v1
+kind: Job
+# Copyright 2022 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+
+metadata:
+  name: "sap-commerce-solrupdateconfig"
+  namespace: "{{ .Values.kubernetes.namespace }}"
+  annotations:
+    app.kubernetes.io/managed-by: "Helm"
+    meta.helm.sh/release-name: "{{ .Values.helm.release }}"
+    meta.helm.sh/release-namespace: "{{ .Values.helm.namespace }}"  
+    # This is what defines this resource as a hook. Without this line, the
+    # job is considered part of the release.
+    "helm.sh/hook": pre-upgrade
+    "helm.sh/hook-weight": "3"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  completions: 1
+  parallelism: 1
+  template:
+    metadata:
+      name: "sap-commerce-solrupdateconfig"
+    spec:
+      serviceAccount: "{{ .Values.kubernetes.sap.serviceAccount }}"
+      serviceAccountName: "{{ .Values.kubernetes.sap.serviceAccountName }}"       
+      restartPolicy: Never
+      containers:
+      {{- if eq .Values.slot.production.color "blue" }}
+      - name: "sap-commerce-solrupdateconfig"
+        image: "{{ .Values.image.repository }}:{{ .Values.image.green_tag }}"
+        args: ["deployment","solr_updateconf"]
+        env:
+          - name: TYPE_SYSTEM_NAME
+            value: "{{ .Values.green_type_system }}"
+      {{- else }}
+      - name: "sap-commerce-solrupdateconfig"
+        image: "{{ .Values.image.repository }}:{{ .Values.image.blue_tag }}"
+        args: ["deployment","solr_updateconf"]
+        env:
+          - name: TYPE_SYSTEM_NAME
+            value: "{{ .Values.blue_type_system }}"
+      {{- end }}
+          - name: MY_POD_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP        
+        envFrom:
+          - configMapRef:
+              name: sap-commerce-configmap      
+{{ end }}

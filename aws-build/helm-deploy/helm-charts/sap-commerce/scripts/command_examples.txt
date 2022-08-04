@@ -1,0 +1,42 @@
+### Deploy Examples
+
+## first deployment (helm install)
+./deploy.sh \
+--ProductionRelease release-platform4 \
+--ProductionTypeSystem release-platform4 \
+--StageRelease release-platform4 \
+--ECRRepositoryName 277468664436.dkr.ecr.eu-west-1.amazonaws.com/sap-commerce-sample-project \
+--HelmReleaseName sap-commerce-project \
+--Environment demo \
+--S3BucketForCommerceConfigurations sap-commerce-sandbox-configurations \
+--StageTypeSystemExists true \
+--StageDomain stage-demo.demo.hybris-on-eks.bersanf.people.aws.dev \
+--ProductionDomain demo.demo.hybris-on-eks.bersanf.people.aws.dev \
+--Region eu-west-1
+
+
+## next deployment (helm upgrade)
+./deploy.sh \
+--ProductionRelease release-platform4 \
+--StageRelease release-platform4 \
+--ECRRepositoryName 277468664436.dkr.ecr.eu-west-1.amazonaws.com/sap-commerce-sample-project \
+--HelmReleaseName sap-commerce-project \
+--Environment demo \
+--S3BucketForCommerceConfigurations sap-commerce-sandbox-configurations \
+--StageTypeSystemExists true \
+--PerformSystemUpdate true \
+--ProductionDomain demo.demo.hybris-on-eks.bersanf.people.aws.dev \
+--StageDomain stage-demo.demo.hybris-on-eks.bersanf.people.aws.dev \
+--Region eu-west-1
+
+### Switch Examples
+./switch.sh \
+--HelmReleaseName sap-commerce-project
+
+
+### Decommission Examples
+./decommission.sh 
+    --HelmReleaseName sap-commerce-project
+
+### uninstall the helm chart
+helm uninstall sap-commerce-project -n default

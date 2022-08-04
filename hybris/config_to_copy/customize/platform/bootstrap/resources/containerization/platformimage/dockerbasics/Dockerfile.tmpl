@@ -1,0 +1,54 @@
+FROM ${baseImage}
+
+LABEL maintainer="bersanf@amazon.com"
+LABEL company="AWS"
+
+ADD binaries/ /opt/
+ADD aspects /opt/aspects
+ADD startup.sh /opt/startup/
+
+RUN yum update -y && yum install hostname awscli tar procps-ng -y && \
+    chmod +x /opt/startup/startup.sh && \
+    chmod +x /opt/tomcat/bin/catalina.sh && \
+    chmod +x /opt/ytools/*.sh
+
+ENV TYPE_SYSTEM_NAME=DEFAULT \
+    CATALINA_SECURITY_OPTS=-Djava.security.egd=file:/dev/./urandom \
+    CATALINA_MEMORY_OPTS=-Xms2G\ -Xmx2G \
+    HTTPS_PORT=${httpsPort} \
+    HTTP_PORT=${httpPort} \
+    HTTP_CONNECTOR_SECURE=${httpConnectorSecure} \
+    AJP_PORT=${ajpPort} \
+    KEYSTORE_LOCATION=/etc/ssl/certs/hybris/keystore \
+    KEYSTORE_ALIAS=1 \
+    KEYSTORE_PASSWORD=123456 \
+    PLATFORM_HOME=/opt/hybris/bin/platform/ \
+    WAIT_FOR="" \
+    JVM_ROUTE="" \
+    PATH="/opt/ytools:${PATH}" \
+    HYBRIS_BIN_DIR=/opt/hybris/bin \
+    HYBRIS_CONFIG_DIR=/opt/hybris/config \
+    HYBRIS_DATA_DIR=/opt/hybris/data \
+    HYBRIS_LOG_DIR=/var/log/hybris \
+    HYBRIS_TEMP_DIR=/opt/hybris/temp \
+    CATALINA_LOG_DIR=${HYBRIS_LOG_DIR}/catalina \
+    ACCESS_LOG_DIR=${HYBRIS_LOG_DIR}/tomcat \
+    ACCESS_LOG_SUFFIX=.log \
+    ACCESS_LOG_PATTERN=combined \
+    ACCESS_LOG_PREFIX=access. \
+    ERROR_SHOW_REPORT=${errorShowReport} \
+    ERROR_SHOW_SERVER_INFO=${errorShowServerInfo} \
+    SOLR_CONFIG_DEFAULT_URLS="http://solr:8983/solr" \
+    SOLR_MODE="standalone" \
+    DB_URL="jdbc:hsqldb:hsql://hsql:9090/hybris;hsqldb.tx=MVCC" \
+    DB_DRIVER=org.hsqldb.jdbcDriver \
+    DB_USERNAME=hybris \
+    DB_PASSWORD=hybris \
+    MEDIA_STRATEGY=localFileMediaStorageStrategy \
+    MEDIA_URL_STRATEGY=localMediaWebURLStrategy \
+    MEDIA_ACCESS_KEY=accessKeyId \
+    MEDIA_SECRET=secret \
+    MEDIA_ENDPOINT=endpoint \ 
+    MEDIA_BUCKET=bucket
+
+ENTRYPOINT ["/opt/startup/startup.sh"]

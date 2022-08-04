@@ -1,0 +1,61 @@
+# Copyright 2022 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+
+### Helm configuration
+helm:
+  release: sap-commerce
+  namespace: default
+
+### Kubernetes configuration
+kubernetes:
+  createNamespace: false
+  namespace: sap-commerce
+  sap:
+    createServiceAccount: false
+    serviceAccount: commerce-service-account
+    serviceAccountName: commerce-service-account
+    #roleArn: arn:aws:iam::<aws-account-number>:role/<role-name>
+    nodeLabelSelector: sap-commerce
+
+### SAP Commerce deployment flags
+deploy:
+  #environment:
+  #s3BucketForConfig:
+  createTypeSystem: false
+  performSystemUpdate: false
+  # performSolrConfigUpdate: false
+  fistTime: true
+
+
+### Slots configuration
+slot:
+  green:
+    enabled: false
+    production: false
+    #typeSystem:
+    #release:
+  blue:
+    enabled: false
+    production: false
+    #typeSystem:
+    #release:
+  production:
+    #color:
+    #domainName:
+    #httpsCertificateArn
+    #typeSystem    
+  stage:
+    #color:
+    #domainName:
+    #httpsCertificateArn
+    #typeSystem:
+    createTypeSystem: false
+    performSystemUpdate: false
+
+### Docker image repository information
+image:
+  repository: <account>.dkr.ecr.<region>.amazonaws.com/<repositoryName>
+  pullPolicy: IfNotPresent
+
+
+
+

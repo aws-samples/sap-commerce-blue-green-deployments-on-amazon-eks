@@ -1,0 +1,16 @@
+apiVersion: v1
+metadata:
+  name: sap-commerce-configmap
+  namespace: "{{ .Values.kubernetes.namespace }}"
+  annotations:
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: sap-commerce-configmap
+    deployment.kubernetes.io/revision: "1"
+
+
+data:
+    SAP_COMMERCE_ENVIRONMENT: {{ .Values.deploy.environment }}
+    S3_BUCKET_COMMERCE_CONFIGURATION: {{ .Values.deploy.s3BucketForConfig }}
+    # SOLR_VERSION: {{ .Values.solr_version }}
+    # ZOOKEEPER_URL: {{ .Values.zookeeper_url }}
+kind: ConfigMap
