@@ -32,11 +32,11 @@ echo "The current production slot is: $currentProductionSlotColor"
 if [ "$currentProductionSlotColor" == "blue" ]; then
     productionSlotColor="green"
     greenProduction=true
-    greenProduction=false
+    blueProduction=false
 else
     productionSlotColor="blue"
     greenProduction=false
-    greenProduction=true
+    blueProduction=true
 fi
 
 ### Upgrade the helm chart to perform the switch
